@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # flutter_test1
 
 A new Flutter project.
@@ -18,4 +18,4 @@ samples, guidance on mobile development, and a full API reference.
 =======
 # flutter_3dgs
 3dgs重建与渲染APP
->>>>>>> 3d5b41c5e684d312adf3b22b8df5ef24328f0b3e
+
