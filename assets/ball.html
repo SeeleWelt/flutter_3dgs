@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Surface Dots (Transparent)</title>
+  <style>
+    /* 关键：body 背景透明 */
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+
+    const scene = new THREE.Scene();
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    const orthoSize = 1.4;
+    const aspect = innerWidth / innerHeight;
+    const camera = new THREE.OrthographicCamera(
+      -orthoSize * aspect, orthoSize * aspect,
+      orthoSize, -orthoSize, 0.1, 1000
+    );
+    camera.position.set(0, 0, 4);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,               // 允许透明通道
+      antialias: true,
+      premultipliedAlpha: false  // 避免黑边
+    });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0x000000, 0); // 完全透明
+    document.body.appendChild(renderer.domElement);
+
+    /* ---- 4. 透明小球 ---- */
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 64, 64),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        metalness: 0,
+        roughness: 0,
+        transmission: 0.8,
+        transparent: true,
+        opacity: 0.85,
+        reflectivity: 0,
+        clearcoat: 0
+      })
+    );
+    scene.add(ball);
+
+    /* ---- 5. 表面采样圆点 ---- */
+    const latSteps = 9;
+    const lonSteps = 18;
+    const dotMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.8
+    });
+    const dotsGrid = Array.from({ length: latSteps }, () => Array(lonSteps));
+
+    for (let i = 1; i <= latSteps; i++) {
+      const v = i / (latSteps + 1);
+      const phi = v * Math.PI;
+      const rLat = Math.sin(phi);
+      const baseSize = 0.04 + 0.03 * rLat;
+
+      for (let j = 0; j < lonSteps; j++) {
+        const theta = j * (2 * Math.PI / lonSteps);
+        const x = rLat * Math.cos(theta);
+        const y = Math.cos(phi);
+        const z = rLat * Math.sin(theta);
+
+        const circle = new THREE.Mesh(
+          new THREE.CircleGeometry(baseSize, 16),
+          dotMaterial.clone()
+        );
+        circle.position.set(x, y, z);
+        circle.lookAt(x * 2, y * 2, z * 2);
+        circle.userData = { isRed: false };
+        ball.add(circle);
+
+        dotsGrid[i - 1][j] = circle;
+      }
+    }
+
+    /* ---- 6. Flutter 通信函数 ---- */
+    window.updateSphereView = function (thetaDeg, phiDeg, distance = 3) {
+      const theta = THREE.MathUtils.degToRad(thetaDeg);
+      const phi = THREE.MathUtils.degToRad(phiDeg);
+      const camX = distance * Math.cos(phi) * Math.cos(theta);
+      const camY = distance * Math.sin(phi);
+      const camZ = distance * Math.cos(phi) * Math.sin(theta);
+      camera.position.set(camX, camY, camZ);
+      camera.lookAt(0, 0, 0);
+    };
+
+    window.markSampledArea = function (phiIdx, thetaIdx) {
+      const dot = dotsGrid[phiIdx]?.[thetaIdx];
+      if (dot && !dot.userData.isRed) {
+        dot.material.color.set(0xff0000);
+        dot.userData.isRed = true;
+      }
+    };
+
+    window.markSampledAreas = function (arr) {
+      if (!Array.isArray(arr)) return;
+      arr.forEach(([p, t]) => window.markSampledArea(p, t));
+    };
+
+    window.clearAllSamples = function () {
+      ball.children.forEach(dot => {
+        if (dot.isMesh) {
+          dot.material.color.set(0xffffff);
+          dot.userData.isRed = false;
+        }
+      });
+    };
+
+    /* ---- 7. 渲染循环 & 自适应 ---- */
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    addEventListener('resize', () => {
+      const a = innerWidth / innerHeight;
+      camera.left = -orthoSize * a;
+      camera.right = orthoSize * a;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
